@@ -1,0 +1,64 @@
+---
+- hosts: app
+  become: true
+  vars_files:
+    - vars.yaml
+  
+  pre_tasks:
+   - name: Update apt cache
+     apt: 
+       update_cache: true 
+       cache_valid_time : 3600
+   - name: Install zip
+     apt:
+       name: zip
+       state: latest
+   - name: Install unzip
+     apt:
+       name: unzip
+       state: latest
+       
+
+  handlers:
+    - name: restart solr
+      service: 
+        name: solr
+        state: restarted
+  
+  tasks:
+    - name: Install java
+      apt: 
+        name: openjdk-8-jdk
+        state: present
+
+    - name: Download solr
+      get_url: 
+        url: "https://archive.apache.org/dist/lucene/solr/{{ solr_version }}/solr-{{ solr_version }}.tgz"
+        dest: "{{ download_dir }}/solr-{{ solr_version }}.tgz"
+        
+    
+    - name: Expand Solr.
+      unarchive:
+        src: "{{ download_dir }}/solr-{{ solr_version }}.tgz"
+        dest: "{{ download_dir }}"
+        remote_src: true
+        creates: "{{ download_dir }}/solr-{{ solr_version }}/README.txt"
+
+        
+
+    - name: Run solr script
+      command: >
+        {{ download_dir }}/solr-{{ solr_version }}/bin/install_solr_service.sh
+        {{ download_dir }}/solr-{{ solr_version }}.tgz
+        -i /opt
+        -d /var/solr
+        -u solr 
+        -s solr
+        -p 8983
+        creates={{ solr_dir }}/bin/solr
+
+    - name: Ensure solr is started and enabled
+      service: 
+        name: solr
+        state: started
+        enabled: yes
